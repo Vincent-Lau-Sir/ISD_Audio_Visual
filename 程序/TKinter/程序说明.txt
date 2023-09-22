@@ -1,0 +1,3 @@
+isd1.py   第一个程序，包括打开logitech摄像头，tkinter基本界面，按select pixel选择像素并显示，退出程序。 2023/7/24
+isd1_capture.py    拍照程序，从1米到13米
+isd2.py  在isd1.py中合并识别人脸的程序，能确定人脸的大概方向

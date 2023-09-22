@@ -1,0 +1,7 @@
+multiconn-clientM2308.py   发送SET0给server， server返回COPY
+multiconn-serverM_2308.py   是对应的server端程序
+
+
+multiconn-clientM2308_2.py   从三维x,y,z值转为delay值,发送第一个delay共四字节给server, server返回COPY
+multiconn-clientM2308_3.py   在multiconn-clientM2308_2.py 基础上，发送全部32个delay给server,server返回COPY
+multiconn-serverM_2308_2.py  是服务端程序，对应multiconn-clientM2308_2.py和multiconn-clientM2308_3.py
