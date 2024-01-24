@@ -31,6 +31,7 @@ import socket
 import selectors
 import types
 import math
+from datetime import datetime
 
 
 sel = selectors.DefaultSelector()
@@ -39,8 +40,8 @@ RecvBuf = []
 sendFlag = False
 MIC_NUMBER = 4  # so far fixed as 4 mics for demo
 INDEX = [x for x in range(MIC_NUMBER)]
-
-
+RECORDING_FLAG = False
+START_COUNTER = 0 
 def start_connections(host, port):
     server_addr = (host, port)
     print("starting connection to", server_addr)
@@ -272,6 +273,16 @@ def handleMotion(event):
 def disable_event():
     pass
 
+def Recording_video():
+    global RECORDING_FLAG,fourcc,out,START_COUNTER
+    if RECORDING_FLAG == False:
+        RECORDING_FLAG = True
+        
+    else:
+        RECORDING_FLAG = False
+        START_COUNTER = 0
+        
+    
 
 def select_pixel():
     global select_pixel_flag
@@ -282,110 +293,157 @@ def select_pixel():
     #  time=str(datetime.datetime.now().today()).replace(':',"_")+'.jpg'
     #  image.save(time)
 
+try: 
+    cap = cv.VideoCapture(1)  # for selecting camera from 0 to 2. In surface Pro, usb camera is '2'
+    if (cap.isOpened() == False):
+        print("Unable to read camera feed")
+    print("Pass 0 ")
+    cap.set(3, 1920)
+    cap.set(4, 1080)
+    print("Pass 1 ")
+    video_width = int(cap.get(3))
+    video_height = int(cap.get(4))
+    border_width = 40
+    down_panel = 120
+    print(cap.isOpened(), video_width, video_height)
+    select_pixel_flag = 0
+    root = tk.Tk()
+    root.title('Acoustic Camera')
+    # root.iconbitmap("lscm.ico")
+    screenwidth = root.winfo_screenwidth()
+    screenheight = root.winfo_screenheight()
+    # Get the resolution of the screen
+    print("Resolution is %dx%d" % (screenwidth, screenheight))
+    if screenwidth < video_width or screenheight <= video_height:
+        print(screenwidth,video_width,screenheight,video_height)
+        print("screen not enough")
+        exit()
+    else:
+        windowsize_string = "{}x{}+{}+{}".format(video_width + border_width,
+                                                video_height + down_panel,
+                                                int((screenwidth - video_width) / 2),
+                                                int((screenheight - video_height) / 2))
+        # Set the windows size: length and height. Note a "*" must be used here
+        # instead of x
+        root.geometry(windowsize_string)
+        root.update()          # Refresh the screen to get size of the window
+        root.config(background="#6fb765")
+        label_video = tk.Label(root, bg="#7CCD7C",
+                            # Set tag geometry
+                            width=video_width, height=video_height,
+                            # Set content format
+                            padx=1, pady=1, borderwidth=1, relief="sunken")
+        label_video.pack(side="top")
+        b1 = tk.Button(root, fg='white', bg='green', activebackground='white', activeforeground='green', text='Select pixel',
+                    relief=tk.RIDGE, height=40, width=20, command=select_pixel)
+        b1.pack(side=tk.LEFT, padx=10, pady=10)
+        b2 = tk.Button(root, fg='white', bg='red', activebackground='white', activeforeground='red', text='EXIT',
+                    height=40, width=20, command=exitWindow)
+        b2.pack(side=tk.LEFT, padx=10, pady=10)
 
-cap = cv.VideoCapture(0)  # for selecting camera from 0 to 2. In surface Pro, usb camera is '2'
-if (cap.isOpened() == False):
-    print("Unable to read camera feed")
-print("Pass 0 ")
-cap.set(3, 1920)
-cap.set(4, 1080)
-print("Pass 1 ")
-video_width = int(cap.get(3))
-video_height = int(cap.get(4))
-border_width = 40
-down_panel = 120
-print(cap.isOpened(), video_width, video_height)
-select_pixel_flag = 0
-root = tk.Tk()
-root.title('Acoustic Camera')
-# root.iconbitmap("lscm.ico")
-screenwidth = root.winfo_screenwidth()
-screenheight = root.winfo_screenheight()
-print("Pass 2 ")
-# Get the resolution of the screen
-print("Resolution is %dx%d" % (screenwidth, screenheight))
-if screenwidth <= video_width or screenheight <= video_height:
-    print("screen not enough")
+        record_button = tk.Button(root, fg='white', bg='blue', activebackground='white', activeforeground='red', text='Record',
+                    height=40, width=20, command=Recording_video)
+        
+        record_button.pack(side=tk.LEFT,padx=10,pady=10)
+
+        text = tk.Text(root, width=40, height=8, undo=False, autoseparators=False)
+        text.pack(side="bottom", padx=10, pady=10)
+        root.protocol("WM_DELETE_WINDOW", disable_event)
+        root.resizable(1, 1)
+
+        # TODO Need to displace this_location latter two x and y with corresponding value -->by estimation
+        # TODO How to pass the selected pixel to this_location? --> Solved
+        # Z=distance between camera and object, x is left+/right-, y is down+/up-
+        # Vincent: suppose the distance between the object and the camera is 2m, x
+        # and y is figured from the window
+        this_location = [2, 0, 0]
+        delay = delay_calculation(this_location)
+        print(delay)
+        delay_binary_output = delay_to_binary(delay)
+        RW_field = [1, 1]
+        reserved_val = [0, 0]
+        type_val = [0, 0]
+        mode = 0
+        mic_num = 0
+        en_bm = 1
+        en_bc = 1
+        mic_en = 1
+        dac_out_sel = [1, 0]
+        message = struct_packet(
+            RW_field,  # 2b
+            reserved_val,  # 2b
+            type_val,  # 2b
+            mode,  # 1b
+            mic_num,  # 5b
+            en_bm,  # 1b
+            en_bc,  # 1b
+            delay_binary_output[0],  # 13b
+            mic_en,  # 1b
+            dac_out_sel)  # 4b
+        print(message)
+        # convert the message in to integers and print out
+        messagehex = BintoINT(message)
+        print(messagehex)
+        message1 = int(messagehex[2:4], 16)  # hex at  1 and 2
+        message2 = int(messagehex[4:6], 16)  # hex at  3 and 4
+        message3 = int(messagehex[6:8], 16)  # hex at  5 and 6
+        message4 = int(messagehex[8:], 16)  # hex at  7 and onwards
+        # print the concerted integers. Each 2-digit hexadecimal number represents
+        # a bytes.
+        print("m1:{},m2:{},m3:{},m4:{}\n".format(
+            message1, message2, message3, message4))
+        
+        # fourcc = cv.VideoWriter_fourcc(*'XVID')  # Use 'XVID' for AVI format
+        fps = int(cap.get(cv.CAP_PROP_FPS))
+        # out = cv.VideoWriter('output.avi', fourcc, fps, (640, 480))  # Adjust resolution as needed
+        fourcc = cv.VideoWriter_fourcc(*"mp4v")
+        counter = 0 
+
+        while True:
+            retval, frame = cap.read()
+            img = frame
+            # Set the codec and create a VideoWriter object
+
+
+        # in case of a user stand in front of or back of the camera
+            # img=cv.flip(img,1)
+            if retval == True:
+                img1 = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+
+                img = ImageTk.PhotoImage(Image.fromarray(img1))
+                label_video['image'] = img
+                root.update()
+                if RECORDING_FLAG == True:
+                     
+                    if START_COUNTER == 0 :
+                        counter +=1
+                        print("pass ",START_COUNTER)
+                        current_datetime = datetime.now()
+                    # Format the date and time
+                        formatted_datetime = current_datetime.strftime("[%m-%d-%y]%H_%M_%S")
+                        print(formatted_datetime)
+                        video_name = str(formatted_datetime)+'.avi'
+                        FPS = 20 
+                        out = cv.VideoWriter(video_name, cv.VideoWriter_fourcc('M','J','P','G'), FPS, (video_width,video_height))
+                        START_COUNTER+=1
+                    else:
+                        out.write(frame)
+                else:
+                    if START_COUNTER >0:
+                        out.release()
+                    
+            else:
+                print("exit program")
+                out.release()
+                cap.release()
+                exit()
+            
+            cv.waitKey(1)
+            
+    # cap.release()
+
+except KeyboardInterrupt:
+    out.release()
+    cap.release()
     exit()
-else:
-    windowsize_string = "{}x{}+{}+{}".format(video_width + border_width,
-                                             video_height + down_panel,
-                                             int((screenwidth - video_width) / 2),
-                                             int((screenheight - video_height) / 2))
-    # Set the windows size: length and height. Note a "*" must be used here
-    # instead of x
-    root.geometry(windowsize_string)
-    root.update()          # Refresh the screen to get size of the window
-    root.config(background="#6fb765")
-    label_video = tk.Label(root, bg="#7CCD7C",
-                           # Set tag geometry
-                           width=video_width, height=video_height,
-                           # Set content format
-                           padx=1, pady=1, borderwidth=1, relief="sunken")
-    label_video.pack(side="top")
-    b1 = tk.Button(root, fg='white', bg='green', activebackground='white', activeforeground='green', text='Select pixel',
-                   relief=tk.RIDGE, height=40, width=20, command=select_pixel)
-    b1.pack(side=tk.LEFT, padx=10, pady=10)
-    b2 = tk.Button(root, fg='white', bg='red', activebackground='white', activeforeground='red', text='EXIT',
-                   height=40, width=20, command=exitWindow)
-    b2.pack(side=tk.LEFT, padx=10, pady=10)
-    text = tk.Text(root, width=40, height=8, undo=False, autoseparators=False)
-    text.pack(side="bottom", padx=10, pady=10)
-    root.protocol("WM_DELETE_WINDOW", disable_event)
-    root.resizable(1, 1)
 
-    # TODO Need to displace this_location latter two x and y with corresponding value -->by estimation
-    # TODO How to pass the selected pixel to this_location? --> Solved
-    # Z=distance between camera and object, x is left+/right-, y is down+/up-
-    # Vincent: suppose the distance between the object and the camera is 2m, x
-    # and y is figured from the window
-    this_location = [2, 0, 0]
-    delay = delay_calculation(this_location)
-    print(delay)
-    delay_binary_output = delay_to_binary(delay)
-    RW_field = [1, 1]
-    reserved_val = [0, 0]
-    type_val = [0, 0]
-    mode = 0
-    mic_num = 0
-    en_bm = 1
-    en_bc = 1
-    mic_en = 1
-    dac_out_sel = [1, 0]
-    message = struct_packet(
-        RW_field,  # 2b
-        reserved_val,  # 2b
-        type_val,  # 2b
-        mode,  # 1b
-        mic_num,  # 5b
-        en_bm,  # 1b
-        en_bc,  # 1b
-        delay_binary_output[0],  # 13b
-        mic_en,  # 1b
-        dac_out_sel)  # 4b
-    print(message)
-    # convert the message in to integers and print out
-    messagehex = BintoINT(message)
-    print(messagehex)
-    message1 = int(messagehex[2:4], 16)  # hex at  1 and 2
-    message2 = int(messagehex[4:6], 16)  # hex at  3 and 4
-    message3 = int(messagehex[6:8], 16)  # hex at  5 and 6
-    message4 = int(messagehex[8:], 16)  # hex at  7 and onwards
-    # print the concerted integers. Each 2-digit hexadecimal number represents
-    # a bytes.
-    print("m1:{},m2:{},m3:{},m4:{}\n".format(
-        message1, message2, message3, message4))
-
-    while True:
-        retval, img = cap.read()
-    # in case of a user stand in front of or back of the camera
-        # img=cv.flip(img,1)
-        if retval == True:
-            img1 = cv.cvtColor(img, cv.COLOR_BGR2RGB)
-            img = ImageTk.PhotoImage(Image.fromarray(img1))
-            label_video['image'] = img
-            root.update()
-        else:
-            print("exit program")
-            exit()
-# cap.release()
