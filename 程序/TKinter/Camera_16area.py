@@ -32,6 +32,43 @@ import selectors
 import types
 import math
 from datetime import datetime
+import os 
+
+# Get Date 
+current_datetime = datetime.now()
+# Format the date and time
+formatted_datetime = current_datetime.strftime("%m-%d-%y")
+
+# Define Directory Path
+CURRENT_PATH = os.getcwd()
+VIDEO_SAVE_DIRECTORY = "\Video"
+VIDEO_DATE = "\\" + formatted_datetime
+
+# Create class for Camera Flag ( Currently implemented recording and start flag)
+class Camera_Viewer:
+    def __init__(self):
+        self.SELECTION_PIXEL = False
+        self.RECORDING = False
+        self.START = True
+
+    # Print Current status 
+    def Print_Status(self):
+        print(f"Selecting Pixel : {self.SELECTION_PIXEL}\nRecording       : {self.RECORDING}\nStart Counter   : {self.START} ")
+
+
+# Create neccessary Directory
+def check_folder_existence(folder_path):
+    if os.path.exists(folder_path) and os.path.isdir(folder_path):
+        print(f"The folder '{folder_path}' exists.")
+    else:
+        print(f"The folder '{folder_path}' does not exist.")
+        os.makedirs(folder_path)
+
+# Create Camera Flag class
+Camera = Camera_Viewer()
+# Create Directory
+check_folder_existence(CURRENT_PATH+VIDEO_SAVE_DIRECTORY)
+check_folder_existence(CURRENT_PATH+VIDEO_SAVE_DIRECTORY+VIDEO_DATE)
 
 
 sel = selectors.DefaultSelector()
@@ -40,8 +77,6 @@ RecvBuf = []
 sendFlag = False
 MIC_NUMBER = 4  # so far fixed as 4 mics for demo
 INDEX = [x for x in range(MIC_NUMBER)]
-RECORDING_FLAG = False
-START_COUNTER = 0 
 def start_connections(host, port):
     server_addr = (host, port)
     print("starting connection to", server_addr)
@@ -273,16 +308,17 @@ def handleMotion(event):
 def disable_event():
     pass
 
-def Recording_video():
-    global RECORDING_FLAG,fourcc,out,START_COUNTER
-    if RECORDING_FLAG == False:
-        RECORDING_FLAG = True
-        
+# Converted to use class instead of global 
+def Recording_video(Camera):
+    Camera.Print_Status()
+    if Camera.RECORDING == False:
+        Camera.RECORDING = True
+
     else:
-        RECORDING_FLAG = False
-        START_COUNTER = 0
-        
-    
+        Camera.RECORDING = False
+        Camera.START = True
+
+
 
 def select_pixel():
     global select_pixel_flag
@@ -341,8 +377,9 @@ try:
                     height=40, width=20, command=exitWindow)
         b2.pack(side=tk.LEFT, padx=10, pady=10)
 
+        # Using Lambda to pass parameters from button action
         record_button = tk.Button(root, fg='white', bg='blue', activebackground='white', activeforeground='red', text='Record',
-                    height=40, width=20, command=Recording_video)
+                    height=40, width=20, command=lambda:Recording_video(Camera))
         
         record_button.pack(side=tk.LEFT,padx=10,pady=10)
 
@@ -413,23 +450,21 @@ try:
                 img = ImageTk.PhotoImage(Image.fromarray(img1))
                 label_video['image'] = img
                 root.update()
-                if RECORDING_FLAG == True:
-                     
-                    if START_COUNTER == 0 :
+                if Camera.RECORDING== True:
+                    if Camera.START == True :
                         counter +=1
-                        print("pass ",START_COUNTER)
                         current_datetime = datetime.now()
                     # Format the date and time
                         formatted_datetime = current_datetime.strftime("[%m-%d-%y]%H_%M_%S")
                         print(formatted_datetime)
-                        video_name = str(formatted_datetime)+'.avi'
+                        video_name = CURRENT_PATH+VIDEO_SAVE_DIRECTORY+VIDEO_DATE + "\\"+str(formatted_datetime)+'.avi'
                         FPS = 20 
                         out = cv.VideoWriter(video_name, cv.VideoWriter_fourcc('M','J','P','G'), FPS, (video_width,video_height))
-                        START_COUNTER+=1
+                        Camera.START = False
                     else:
                         out.write(frame)
                 else:
-                    if START_COUNTER >0:
+                    if Camera.START == False:
                         out.release()
                     
             else:
@@ -447,3 +482,10 @@ except KeyboardInterrupt:
     cap.release()
     exit()
 
+# Will need work to convert all gloabl into class to use following setting
+
+# if __name__ == "__main__":
+#     # This block will only execute if the script is run directly, not if it's imported as a module
+#     Run_Camera_View()
+# else:
+#     print("Incorrect Operation!!! Check your Path !")
