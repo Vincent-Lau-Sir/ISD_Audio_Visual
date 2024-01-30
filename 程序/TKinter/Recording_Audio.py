@@ -4,8 +4,16 @@ from datetime import datetime
 import os 
 import numpy as np 
 from moviepy.editor import VideoFileClip, AudioFileClip
-# from moviepy.audio.fx.all import audio_fadein
+# from Camera_16area import Return_recording_time
+# from moviepy.audio.fx.all import audio_fadei
+import time 
 
+def check_folder_existence(folder_path):
+    if os.path.exists(folder_path) and os.path.isdir(folder_path):
+        print(f"The folder '{folder_path}' exists.")
+    else:
+        print(f"The folder '{folder_path}' does not exist.")
+        os.makedirs(folder_path)
 
 def combine_video_audio(video_path, audio_path, output_path):
     # Load the video clip
@@ -18,15 +26,9 @@ def combine_video_audio(video_path, audio_path, output_path):
     video_clip = video_clip.set_audio(audio_clip)
 
     # Write the combined clip to a new file
-    video_clip.write_videofile(output_path, codec="libx264", audio_codec="aac", temp_audiofile='temp.m4a', remove_temp=True, options=["-analyzeduration", "100M", "-probesize", "100M"])
+    video_clip.write_videofile(output_path, codec="libx264", audio_codec="aac", temp_audiofile='temp.m4a', remove_temp=True)
 
 
-def check_folder_existence(folder_path):
-    if os.path.exists(folder_path) and os.path.isdir(folder_path):
-        print(f"The folder '{folder_path}' exists.")
-    else:
-        print(f"The folder '{folder_path}' does not exist.")
-        os.makedirs(folder_path)
 
 def Start_recording():
     current_datetime = datetime.now()
@@ -55,7 +57,21 @@ def Start_recording():
             wf.setsampwidth(2)  # 16-bit
             wf.setframerate(samplerate)
             wf.writeframes(audio_data.tobytes())
-    return True
+        
+    time.sleep(7)
+
+    with open(os.getcwd()+"/FileList.txt", 'r') as file:
+        # Read and print each line
+        Output=[0]*3
+        line = file.readline()
+        counter = 0
+        while line:
+            print(line.strip())  # Strip removes the newline character
+            line = file.readline()
+            Output[counter] = line.strip()
+            counter+=1
+    
+    combine_video_audio(Output[0],Output[1],Output[2])
 
 if __name__ == "__main__":
     Start_recording()

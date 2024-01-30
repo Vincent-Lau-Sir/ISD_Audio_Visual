@@ -33,7 +33,7 @@ import types
 import math
 from datetime import datetime
 import os 
-from Recording_Audio import combine_video_audio
+# from Recording_Audio import combine_video_audio
 
 # from Recording_Audio import Start_recording
 # new library for recording sound 
@@ -44,7 +44,8 @@ import subprocess
 current_datetime = datetime.now()
 # Format the date and time
 formatted_datetime = current_datetime.strftime("%m-%d-%y")
-
+RECORDING_DURATION = 5
+SOFTWARE_SETTLING = 4
 # Define Directory Path
 CURRENT_PATH = os.getcwd()
 VIDEO_SAVE_DIRECTORY = "\Video"
@@ -63,6 +64,9 @@ class Camera_Viewer:
     def Print_Status(self):
         print(f"Selecting Pixel : {self.SELECTION_PIXEL}\nRecording       : {self.RECORDING}\nStart Counter   : {self.START} ")
 
+def Return_recording_time():
+    global RECORDING_DURATION
+    return RECORDING_DURATION
 
 def get_newest_file(directory):
     # Get a list of all files in the directory
@@ -75,7 +79,6 @@ def get_newest_file(directory):
     newest_file = max(file_times, key=lambda x: x[1], default=None)
 
     return newest_file
-
 
 
 
@@ -345,14 +348,6 @@ def Recording_video(Camera):
         Camera.START = True
 
 
-def record_audio(duration, samplerate=44100):
-    print("Recording...")
-    audio_data = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=2, dtype=np.int16)
-    sd.wait()  # Wait until recording is finished
-    print("Recording done.")
-    return audio_data
-
-
 def select_pixel():
     global select_pixel_flag
     if select_pixel_flag == 0:
@@ -488,43 +483,44 @@ try:
                 root.update()
                 if Camera.RECORDING== True:
                     if Camera.START == True :
-                        counter +=1
+                        Camera.START = False
                         current_datetime = datetime.now()
-                    # Format the date and time
                         formatted_datetime = current_datetime.strftime("[%m-%d-%y]%H_%M_%S")
                         print(formatted_datetime)
                         video_name = CURRENT_PATH+VIDEO_SAVE_DIRECTORY+VIDEO_DATE + "\\"+str(formatted_datetime)+'.avi'
-                        FPS = 20 
+                        FPS = 30
                         out = cv.VideoWriter(video_name, cv.VideoWriter_fourcc('M','J','P','G'), FPS, (video_width,video_height))
-                        Camera.START = False
-                        # os.system("python3 Recording_Audio.py")
+                        
                         Audio_Processing = subprocess.Popen(["cmd", "/c", "start", "cmd", "/k", command], shell=True)
                     else:
                         # wait for the cmd start 
-                        if int(New_datetime.timestamp())-int(current_datetime.timestamp()) ==4:
-                            print("Recording audio and Video")
-
-                        if int(New_datetime.timestamp())-int(current_datetime.timestamp()) > 4:
-                            # print("Recording audio and Video")
+                        if int(New_datetime.timestamp())-int(current_datetime.timestamp()) > SOFTWARE_SETTLING:
                             out.write(frame)
                         
-                        if int(New_datetime.timestamp())-int(current_datetime.timestamp()) > 10:
+                        if int(New_datetime.timestamp())-int(current_datetime.timestamp()) > SOFTWARE_SETTLING +RECORDING_DURATION:
                             Camera.RECORDING = False
                             Camera.SAVE_VIDEO = True
+                            Off_time = int(datetime.now().timestamp())
                 else:
                     if Camera.START == False:
                         out.release()
-                        timewait = int(New_datetime.timestamp())-int(current_datetime.timestamp())
-                        if  timewait == 30:
+                        timewait = int(New_datetime.timestamp())-Off_time
+                        if  timewait == 5:
                             if Camera.SAVE_VIDEO == True:
-                                Audio_name = get_newest_file(CURRENT_PATH+"\Audio")
-                                
-                                Audio_name = CURRENT_PATH+"\Audio\\" + Audio_name[0]
-                                Output = CURRENT_PATH+VIDEO_SAVE_DIRECTORY+VIDEO_DATE + "\\"+str(formatted_datetime)+'Combined.mp4'
-                                print(video_name)
-                                print(Audio_name)
-                                print(Output)
+                                Audio_name = CURRENT_PATH+"\Audio\\" + get_newest_file(CURRENT_PATH+"\Audio")[0]
+                                # Audio_name = Audio_name[0]
+                                Output = CURRENT_PATH+VIDEO_SAVE_DIRECTORY+VIDEO_DATE + "\\"+str(formatted_datetime)+'Combined.avi'
                                 Camera.SAVE_VIDEO = False
+                                Output_file = CURRENT_PATH+"/FileList.txt"
+                                print("output file :" , Output_file)
+                                with open(Output_file, 'w') as file:
+                                    # Write some text to the file
+                                    file.write(Audio_name)
+                                    file.write("\n")
+                                    file.write(video_name)
+                                    file.write("\n")
+                                    file.write(Output)
+                              
                                 # combine_video_audio(video_name,Audio_name,Output)
                        
                     
