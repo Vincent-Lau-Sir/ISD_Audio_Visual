@@ -33,6 +33,12 @@ import types
 import math
 from datetime import datetime
 import os 
+from Recording_Audio import combine_video_audio
+
+# from Recording_Audio import Start_recording
+# new library for recording sound 
+import subprocess
+
 
 # Get Date 
 current_datetime = datetime.now()
@@ -43,6 +49,7 @@ formatted_datetime = current_datetime.strftime("%m-%d-%y")
 CURRENT_PATH = os.getcwd()
 VIDEO_SAVE_DIRECTORY = "\Video"
 VIDEO_DATE = "\\" + formatted_datetime
+command = "c:/Python/Python310/python.exe " + CURRENT_PATH + "/程序/TKinter/Recording_Audio.py"
 
 # Create class for Camera Flag ( Currently implemented recording and start flag)
 class Camera_Viewer:
@@ -50,10 +57,26 @@ class Camera_Viewer:
         self.SELECTION_PIXEL = False
         self.RECORDING = False
         self.START = True
+        self.SAVE_VIDEO = False
 
     # Print Current status 
     def Print_Status(self):
         print(f"Selecting Pixel : {self.SELECTION_PIXEL}\nRecording       : {self.RECORDING}\nStart Counter   : {self.START} ")
+
+
+def get_newest_file(directory):
+    # Get a list of all files in the directory
+    all_files = os.listdir(directory)
+
+    # Filter out directories and get the creation time for each file
+    file_times = [(file, os.path.getctime(os.path.join(directory, file))) for file in all_files if os.path.isfile(os.path.join(directory, file))]
+
+    # Find the file with the maximum creation time (newest file)
+    newest_file = max(file_times, key=lambda x: x[1], default=None)
+
+    return newest_file
+
+
 
 
 # Create neccessary Directory
@@ -308,6 +331,9 @@ def handleMotion(event):
 def disable_event():
     pass
 
+def Capture_frame(Output,frame):
+    Output.write(frame)
+
 # Converted to use class instead of global 
 def Recording_video(Camera):
     Camera.Print_Status()
@@ -318,6 +344,13 @@ def Recording_video(Camera):
         Camera.RECORDING = False
         Camera.START = True
 
+
+def record_audio(duration, samplerate=44100):
+    print("Recording...")
+    audio_data = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=2, dtype=np.int16)
+    sd.wait()  # Wait until recording is finished
+    print("Recording done.")
+    return audio_data
 
 
 def select_pixel():
@@ -364,6 +397,7 @@ try:
         root.geometry(windowsize_string)
         root.update()          # Refresh the screen to get size of the window
         root.config(background="#6fb765")
+       
         label_video = tk.Label(root, bg="#7CCD7C",
                             # Set tag geometry
                             width=video_width, height=video_height,
@@ -386,7 +420,8 @@ try:
         text = tk.Text(root, width=40, height=8, undo=False, autoseparators=False)
         text.pack(side="bottom", padx=10, pady=10)
         root.protocol("WM_DELETE_WINDOW", disable_event)
-        root.resizable(1, 1)
+        # root.resizable(1, 1)
+        root.resizable(False, False)
 
         # TODO Need to displace this_location latter two x and y with corresponding value -->by estimation
         # TODO How to pass the selected pixel to this_location? --> Solved
@@ -445,6 +480,7 @@ try:
         # in case of a user stand in front of or back of the camera
             # img=cv.flip(img,1)
             if retval == True:
+                New_datetime=datetime.now()
                 img1 = cv.cvtColor(img, cv.COLOR_BGR2RGB)
 
                 img = ImageTk.PhotoImage(Image.fromarray(img1))
@@ -461,11 +497,36 @@ try:
                         FPS = 20 
                         out = cv.VideoWriter(video_name, cv.VideoWriter_fourcc('M','J','P','G'), FPS, (video_width,video_height))
                         Camera.START = False
+                        # os.system("python3 Recording_Audio.py")
+                        Audio_Processing = subprocess.Popen(["cmd", "/c", "start", "cmd", "/k", command], shell=True)
                     else:
-                        out.write(frame)
+                        # wait for the cmd start 
+                        if int(New_datetime.timestamp())-int(current_datetime.timestamp()) ==4:
+                            print("Recording audio and Video")
+
+                        if int(New_datetime.timestamp())-int(current_datetime.timestamp()) > 4:
+                            # print("Recording audio and Video")
+                            out.write(frame)
+                        
+                        if int(New_datetime.timestamp())-int(current_datetime.timestamp()) > 10:
+                            Camera.RECORDING = False
+                            Camera.SAVE_VIDEO = True
                 else:
                     if Camera.START == False:
                         out.release()
+                        timewait = int(New_datetime.timestamp())-int(current_datetime.timestamp())
+                        if  timewait == 30:
+                            if Camera.SAVE_VIDEO == True:
+                                Audio_name = get_newest_file(CURRENT_PATH+"\Audio")
+                                
+                                Audio_name = CURRENT_PATH+"\Audio\\" + Audio_name[0]
+                                Output = CURRENT_PATH+VIDEO_SAVE_DIRECTORY+VIDEO_DATE + "\\"+str(formatted_datetime)+'Combined.mp4'
+                                print(video_name)
+                                print(Audio_name)
+                                print(Output)
+                                Camera.SAVE_VIDEO = False
+                                # combine_video_audio(video_name,Audio_name,Output)
+                       
                     
             else:
                 print("exit program")
