@@ -19,8 +19,15 @@ class VideoThread(QThread):
     def run(self):
         # capture from web cam
         cap = cv2.VideoCapture(0)
+        cap.set(3, 1920)
+        cap.set(4, 1080)
+        video_width = int(cap.get(3))
+        video_height = int(cap.get(4))
+
+        print(video_height,video_width)
         while True:
             ret, cv_img = cap.read()
+            
             if ret:
                 self.change_pixmap_signal.emit(cv_img)
 
@@ -38,13 +45,16 @@ class App(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("ISD Mic array Project")
-        self.disply_width = 1280
-        self.display_height = 720
+        self.disply_width = 1870
+        self.display_height = 1080
         self.LPF_Select = Frequency_Selection.LPF_FULL.value
         self.ButtonText = QFont("Arial", 15)
         # create the label that holds the image
         self.image_label = QLabel(self)
         self.image_label.resize(self.disply_width, self.display_height)
+        self.image_label.setFixedSize(1920,800)
+
+        self.RECORDING = False
         
 
         self.stacked_widget = QStackedWidget()
@@ -61,30 +71,46 @@ class App(QWidget):
         self.ExitButton.setFixedSize(NUM_BUTTON_WIDTH,NUM_BUTTON_HEIGHT)
         self.ExitButton.setText("Exit")
         self.ExitButton.setFont(self.ButtonText)
-        
+        self.ExitButton.setStyleSheet("background-color:white;color:black ;border-width: 4px;border-radius: 20px;")
 
         self.SettingButton = QPushButton()
         self.SettingButton.clicked.connect(self.switchPage)
         self.SettingButton.setFixedSize(NUM_BUTTON_WIDTH,NUM_BUTTON_HEIGHT)
         self.SettingButton.setText("Setting")
         self.SettingButton.setFont(self.ButtonText)
+        self.SettingButton.setStyleSheet("background-color:white;color:black ;border-width: 4px;border-radius: 20px;")
 
 
         #Setting Up Main Page 
         self.MainPage = QGridLayout()
-        self.MainPage.addWidget(self.image_label,0,0,1,3)
-
+        # self.MainPage = QVBoxLayout()
+        self.MainPage.addWidget(self.image_label,0,0)
+        # self.MainPage.addWidget(self.image_label)
+        
 
         self.RecordButton = QPushButton()
-        # self.RecordButton.clicked.connect(self.Record_video)
+        self.RecordButton.clicked.connect(self.Record_clicked)
         self.RecordButton.setFixedSize(NUM_BUTTON_WIDTH,NUM_BUTTON_HEIGHT)
         self.RecordButton.setText("Record")
         self.RecordButton.setFont(self.ButtonText)
+        self.RecordButton.setStyleSheet("background-color:white;color:black ;border-width: 4px;border-radius: 20px;")
 
         # self.MainPage.addWidget(self.textLabel,1,2,1,2)
-        self.MainPage.addWidget(self.ExitButton,1,0,3,1)
-        self.MainPage.addWidget(self.RecordButton,1,1,3,1)
-        self.MainPage.addWidget(self.SettingButton,1,2,3,1)
+
+        self.MainPage_button = QHBoxLayout()
+        self.MainPage_button.addWidget(self.ExitButton)
+        self.MainPage_button.addWidget(self.RecordButton)
+        self.MainPage_button.addWidget(self.SettingButton)
+
+        self.MainPage_button_widget = QWidget()
+        self.MainPage_button_widget.setLayout(self.MainPage_button)
+
+        self.MainPage.addWidget(self.MainPage_button_widget,1,0)
+
+
+        # self.MainPage.addWidget(self.ExitButton,1,0,3,1)
+        # self.MainPage.addWidget(self.RecordButton,1,1,3,1)
+        # self.MainPage.addWidget(self.SettingButton,1,2,3,1)
 
         self.MainPageWidget = QWidget()
         self.MainPageWidget.setLayout(self.MainPage)
@@ -167,7 +193,7 @@ class App(QWidget):
         
         self.SettingPageWidget = QWidget()
         self.SettingPageWidget.setLayout(self.SettingPage)
-        self.SettingPageWidget.setFixedSize(700,400)
+        self.SettingPageWidget.setFixedSize(1920,1080)
         self.SettingPageWidget.setGeometry(int((1920-700)/2),int((1080-400)/2),700,400)
 
 
@@ -189,9 +215,9 @@ class App(QWidget):
  
 
         # self.Monitor = QDesktopWidget().screenGeometry(display_monitor)
-        self.setGeometry(QApplication.screens()[1].geometry())
+        self.setGeometry(QApplication.screens()[0].geometry())
         # self.setGeometry(self.Monitor.left(),self.Monitor.right())
-        # self.showFullScreen()
+        self.showFullScreen()
         # create the video capture thread
         self.thread = VideoThread()
         # connect its signal to the update_image slot
@@ -230,6 +256,13 @@ class App(QWidget):
                      list_of_range[i].setEnabled(False)
                 # else:
                     # list_of_range[i].setChecked(False)
+    
+    def Record_clicked(self):
+        self.RECORDING = not self.RECORDING
+        if self.RECORDING == True:
+            self.RecordButton.setStyleSheet("background-color:red ; color :white ;border-width: 4px;border-radius: 20px;")
+        else:
+            self.RecordButton.setStyleSheet("background-color:white;color:black ;border-width: 4px;border-radius: 20px;")
                   
 
     def switchPage(self):
