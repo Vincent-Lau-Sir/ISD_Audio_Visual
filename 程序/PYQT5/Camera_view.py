@@ -11,7 +11,7 @@ import numpy as np
 display_monitor= 0
 NUM_BUTTON_WIDTH = 200
 NUM_BUTTON_HEIGHT = 100
-DEBUG = False
+DEBUG = True
 
 BUTTON_STYLE = """
         QPushButton {
@@ -100,12 +100,12 @@ class App(QWidget):
         else:
             self.ScreenNumber = 0
         self.setWindowTitle("ISD Mic array Project")
-        if DEBUG == True:
-            self.disply_width = 1600
-            self.display_height = 980
-        else:
-            self.disply_width = 1920
-            self.display_height = 1080
+        # if DEBUG == True:
+        #     self.disply_width = 1600
+        #     self.display_height = 980
+        # else:
+        self.disply_width = 1920
+        self.display_height = 1080
         self.LPF_Select = Frequency_Selection.LPF_FULL.value
         self.ButtonText = QFont("Arial", 15)
         # create the label that holds the image
@@ -114,10 +114,10 @@ class App(QWidget):
         self.image_label.setStyleSheet("")
         self.image_label.setFont(QFont("Arial",40))
         # self.image_label.resize(self.disply_width, self.display_height)
-        if DEBUG == True:         
-            self.image_label.setFixedSize(1600,980)
-        else:
-            self.image_label.setFixedSize(1920,1080)
+        # if DEBUG == True:         
+        #     self.image_label.setFixedSize(1600,880)
+        # else:
+        self.image_label.setFixedSize(1920,1080)
 
         self.image_label.setStyleSheet("background-color:Grey;border-width: 4px;border-radius: 20px;alignment:center")
         self.image_label.setContentsMargins(0,0,0,0)
@@ -127,7 +127,7 @@ class App(QWidget):
 
         self.stacked_widget = QStackedWidget()
         self.stacked_widget.setContentsMargins(0, 0, 0, 0)  # Set margins to zero
-         
+        
         self.stacked_widget.setFixedSize(1920,1080)
         # self.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 green, stop:1 white);")
         self.setStyleSheet("background-color:lightgreen")
@@ -168,12 +168,12 @@ class App(QWidget):
         self.MainPage.setVerticalSpacing(0)
         # self.MainPage = QVBoxLayout()
         self.MainPage.addWidget(self.image_label,0,0,alignment=Qt.AlignCenter)
-        self.MainPage.setHorizontalSpacing(0)  # Set horizontal spacing to zero   
-        self.MainPage.setVerticalSpacing(0)  # Set horizontal spacing to zero   
+       
         
         if DEBUG == True:
-            self.MainPage.addWidget(self.text_label,0,)
-        
+            self.MainPage.addWidget(self.text_label,0,0,alignment=Qt.AlignRight)
+        self.MainPage.setHorizontalSpacing(0)  # Set horizontal spacing to zero   
+        self.MainPage.setVerticalSpacing(0)  # Set horizontal spacing to zero   
         # self.MainPage.addWidget(self.image_label)
         
 
@@ -195,6 +195,7 @@ class App(QWidget):
         self.MainPage_button_widget.setLayout(self.MainPage_button)
         self.MainPage_button_widget.setStyleSheet("background-color:transparent")
         self.MainPage_button_widget.setFixedSize(1920,200)
+        
         if DEBUG == True:
             self.MainPage.addWidget(self.MainPage_button_widget,1,0,1,2)
         else:
