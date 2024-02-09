@@ -11,7 +11,7 @@ import numpy as np
 display_monitor= 0
 NUM_BUTTON_WIDTH = 200
 NUM_BUTTON_HEIGHT = 100
-DEBUG = True
+DEBUG = False
 
 BUTTON_STYLE = """
         QPushButton {
@@ -38,7 +38,7 @@ BUTTON_STYLE_RED = """
         }
     """ 
 SLIDER_STYLE = """
-                            .QSlider {
+                .QSlider {
                     min-height: 68px;
                     max-height: 68px;
                
@@ -48,9 +48,7 @@ SLIDER_STYLE = """
                  
                     height: 5px;
                     background: white;
-                    margin: 0 12px;
-                    border-width: 10px;
-                        border-radius: 20px;
+                    
                 }
 
                 .QSlider::handle:horizontal {
@@ -58,8 +56,7 @@ SLIDER_STYLE = """
                     width: 23px;
                     height: 100px;
                     margin: -24px -12px;
-                    border-width: 4px;
-                    border-radius: 20px;
+                  
                 }
                             }
         """
@@ -80,10 +77,10 @@ class VideoThread(QThread):
 
         print(video_height,video_width)
         while True:
-            ret, cv_img = cap.read()
+            ret, self.cv_img = cap.read()
             
             if ret:
-                self.change_pixmap_signal.emit(cv_img)
+                self.change_pixmap_signal.emit(self.cv_img)
 
 class APP_PAGE(Enum):
         MAIN = 0
@@ -105,10 +102,10 @@ class App(QWidget):
         self.setWindowTitle("ISD Mic array Project")
         if DEBUG == True:
             self.disply_width = 1600
-            self.display_height = 1080
+            self.display_height = 980
         else:
             self.disply_width = 1920
-            self.display_height = 800
+            self.display_height = 1080
         self.LPF_Select = Frequency_Selection.LPF_FULL.value
         self.ButtonText = QFont("Arial", 15)
         # create the label that holds the image
@@ -118,10 +115,12 @@ class App(QWidget):
         self.image_label.setFont(QFont("Arial",40))
         # self.image_label.resize(self.disply_width, self.display_height)
         if DEBUG == True:         
-            self.image_label.setFixedSize(1600,800)
+            self.image_label.setFixedSize(1600,980)
         else:
-            self.image_label.setFixedSize(1600,800)
-        self.image_label.setStyleSheet("background-color:Grey;border-width: 4px;border-radius: 20px;")
+            self.image_label.setFixedSize(1920,1080)
+
+        self.image_label.setStyleSheet("background-color:Grey;border-width: 4px;border-radius: 20px;alignment:center")
+        self.image_label.setContentsMargins(0,0,0,0)
 
         self.RECORDING = False
         
@@ -168,9 +167,12 @@ class App(QWidget):
         self.MainPage.setHorizontalSpacing(0)  # Set horizontal spacing to zero   
         self.MainPage.setVerticalSpacing(0)
         # self.MainPage = QVBoxLayout()
-        self.MainPage.addWidget(self.image_label,0,0)
+        self.MainPage.addWidget(self.image_label,0,0,alignment=Qt.AlignCenter)
+        self.MainPage.setHorizontalSpacing(0)  # Set horizontal spacing to zero   
+        self.MainPage.setVerticalSpacing(0)  # Set horizontal spacing to zero   
+        
         if DEBUG == True:
-            self.MainPage.addWidget(self.text_label,0,1)
+            self.MainPage.addWidget(self.text_label,0,)
         
         # self.MainPage.addWidget(self.image_label)
         
@@ -185,21 +187,20 @@ class App(QWidget):
         # self.MainPage.addWidget(self.textLabel,1,2,1,2)
 
         self.MainPage_button = QHBoxLayout()
-        self.MainPage_button.addWidget(self.ExitButton)
+        self.MainPage_button.addWidget(self.ExitButton,alignment=Qt.AlignLeft)
         self.MainPage_button.addWidget(self.RecordButton)
-        self.MainPage_button.addWidget(self.SettingButton)
+        self.MainPage_button.addWidget(self.SettingButton,alignment=Qt.AlignRight)
 
         self.MainPage_button_widget = QWidget()
         self.MainPage_button_widget.setLayout(self.MainPage_button)
-        self.MainPage_button_widget.setStyleSheet("background-color:lightgreen")
-        self.MainPage_button_widget.setFixedSize(1820,180)
+        self.MainPage_button_widget.setStyleSheet("background-color:transparent")
+        self.MainPage_button_widget.setFixedSize(1920,200)
         if DEBUG == True:
             self.MainPage.addWidget(self.MainPage_button_widget,1,0,1,2)
         else:
-            self.MainPage.addWidget(self.MainPage_button_widget,1,0)
+            self.MainPage.addWidget(self.MainPage_button_widget,0,0,alignment=Qt.AlignBottom)
              
-        self.MainPage.setHorizontalSpacing(0)  # Set horizontal spacing to zero   
-        self.MainPage.setVerticalSpacing(0)  # Set horizontal spacing to zero   
+       
 
 
         # self.MainPage.addWidget(self.ExitButton,1,0,3,1)
@@ -208,6 +209,7 @@ class App(QWidget):
 
         self.MainPageWidget = QWidget()
         self.MainPageWidget.setLayout(self.MainPage)
+        self.MainPageWidget.setFixedSize(1920,1080)
 
         #Setting up Setting page for LPF and Gain and Voulme 
         self.SettingPage = QGridLayout()
@@ -315,10 +317,16 @@ class App(QWidget):
         
         self.SettingPageWidget = QWidget()
         self.SettingPageWidget.setLayout(self.SettingPage)
+        
         self.SettingPageWidget.setFixedSize(1920,1080)
-        self.SettingPageWidget.setGeometry(int((1920-700)/2),int((1080-400)/2),700,400)
+        self.SettingPageWidget.setGeometry(1920,1080,700,400)
 
 
+        # setAlignment(Qt.AlignLeft|Qt.AlignRight)
+        self.stacked_widget.setContentsMargins(0,0,0,0)
+        self.MainPage.setContentsMargins(0,0,0,0)
+        self.layout.setContentsMargins(0,0,0,0)
+       
         self.stacked_widget.addWidget(self.MainPageWidget)
         self.stacked_widget.addWidget(self.SettingPageWidget)
 
@@ -326,6 +334,8 @@ class App(QWidget):
 
         # self.stacked_widget.(self.MainPage)
         self.layout.addWidget(self.stacked_widget)
+        # self.setContentsMargins(0,0,0,0)
+        
 
         # create a vertical box layout and add the two labels
         # vbox = QVBoxLayout()
@@ -386,7 +396,7 @@ class App(QWidget):
 
             self.text_label.appendPlainText("Recording")
         else:
-            self.RecordButton.setStyleSheet("background-color:white;color:black ;border-width: 4px;border-radius: 20px;")
+            self.RecordButton.setStyleSheet(BUTTON_STYLE_RED)
             self.text_label.appendPlainText("Stopped Recording")   
                   
 
