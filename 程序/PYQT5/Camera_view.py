@@ -296,9 +296,16 @@ class App(QWidget):
         self.BackButton.setFont(self.ButtonText)
         self.BackButton.setStyleSheet(BUTTON_STYLE )
         self.BackButton.setFont(QFont("Arial",40))
-        
 
-        
+        self.ApplyButton = QPushButton()
+        # self.ApplyButton.clicked.connect(self.switchPage)
+        self.ApplyButton.setFixedSize(NUM_BUTTON_WIDTH+100,NUM_BUTTON_HEIGHT)
+        self.ApplyButton.setText("Apply")
+        self.ApplyButton.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.ApplyButton.setFont(self.ButtonText)
+        self.ApplyButton.setStyleSheet(BUTTON_STYLE )
+        self.ApplyButton.setFont(QFont("Arial",40))
+
 
 
         self.SettingPage.addWidget(self.GainLabel,1,0)
@@ -313,14 +320,15 @@ class App(QWidget):
         self.SettingPage.addWidget(self.CheckBox_18kHz,3,3)
         self.SettingPage.addWidget(self.CheckBox_Full,3,4)
 
-        self.SettingPage.addWidget(self.BackButton,4,0,1,2)
+        self.SettingPage.addWidget(self.ApplyButton,4,0,1,4,alignment=Qt.AlignRight)
+        self.SettingPage.addWidget(self.BackButton,4,1,1,4,alignment=Qt.AlignRight)
         
         
         self.SettingPageWidget = QWidget()
         self.SettingPageWidget.setLayout(self.SettingPage)
         
         self.SettingPageWidget.setFixedSize(1920,1080)
-        self.SettingPageWidget.setGeometry(1920,1080,700,400)
+        # self.SettingPageWidget.setGeometry(1920,1080,960,1080)
 
 
         # setAlignment(Qt.AlignLeft|Qt.AlignRight)
