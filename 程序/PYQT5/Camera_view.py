@@ -5,63 +5,17 @@ from PyQt5.QtGui import *
 import sys
 import cv2
 from enum import Enum
-
+from Style import *
 import numpy as np
-
+import sounddevice as sd 
+import os 
+import wavio #pip3 install wavio
 display_monitor= 0
 NUM_BUTTON_WIDTH = 200
 NUM_BUTTON_HEIGHT = 100
 DEBUG = True
-
-BUTTON_STYLE = """
-        QPushButton {
-            background-color: White; 
-            color : Black;
-            border-width: 4px;
-            border-radius: 20px;
-        }
-        QPushButton:hover {
-            color: white;
-            background-color: darkgreen
-        }
-    """ 
-BUTTON_STYLE_RED = """
-        QPushButton {
-            background-color: Gray; 
-            color : white;
-            border-width: 4px;
-            border-radius: 20px;
-        }
-        QPushButton:hover {
-            color: white;
-            background-color: red
-        }
-    """ 
-SLIDER_STYLE = """
-                .QSlider {
-                    min-height: 68px;
-                    max-height: 68px;
-               
-                }
-
-                .QSlider::groove:horizontal {
-                 
-                    height: 5px;
-                    background: white;
-                    
-                }
-
-                .QSlider::handle:horizontal {
-                    background: Darkgreen;
-                    width: 23px;
-                    height: 100px;
-                    margin: -24px -12px;
-                  
-                }
-                            }
-        """
-
 BUTTON_FONT = QFont("Arial",40)
+CURRENT_PATH = os.getcwd()
 
 class VideoThread(QThread):
     change_pixmap_signal = pyqtSignal(np.ndarray)
@@ -86,11 +40,43 @@ class APP_PAGE(Enum):
         MAIN = 0
         SETTING = 1
         
+
+class AudioThread(QThread):
+    global STOP
+    def run(self):
+        sample_rate = 44100  # Hz
+        duration = 10  # seconds
+        self.audio_buffer = []  # Buffer to store recorded audio data
+
+        # Use a callback function for non-blocking audio recording
+        def callback(indata, frames, time, status):
+            if status:
+                print(status)
+            # print("Recording audio...")
+            self.audio_buffer.append(indata.copy())
+
+        with sd.InputStream(callback=callback, channels=1, samplerate=sample_rate):
+            self.sleep(duration)
+        
+        # Convert the buffer to a numpy array
+        audio_data = np.concatenate(self.audio_buffer, axis=0)
+
+        # Save the audio data to a WAV file
+        wavio.write("recorded_audio.wav", audio_data, sample_rate, sampwidth=3)
+        print("Finsihed Recording")
+        STOP=True
+
+
+
+
 class Frequency_Selection(Enum):
         LPF_6K = 0
         LPF_12K = 1
         LPF_18K = 2
         LPF_FULL = 3
+
+        def Frequency_list(self):
+            return [self.LPF_6K,self.LPF_12K,self.LPF_18K,self.LPF_FULL] 
 
 class App(QWidget):
     def __init__(self):
@@ -100,10 +86,7 @@ class App(QWidget):
         else:
             self.ScreenNumber = 0
         self.setWindowTitle("ISD Mic array Project")
-        # if DEBUG == True:
-        #     self.disply_width = 1600
-        #     self.display_height = 980
-        # else:
+
         self.disply_width = 1920
         self.display_height = 1080
         self.LPF_Select = Frequency_Selection.LPF_FULL.value
@@ -113,10 +96,7 @@ class App(QWidget):
         self.image_label.setText("Loading Camera Frame ...")
         self.image_label.setStyleSheet("")
         self.image_label.setFont(QFont("Arial",40))
-        # self.image_label.resize(self.disply_width, self.display_height)
-        # if DEBUG == True:         
-        #     self.image_label.setFixedSize(1600,880)
-        # else:
+
         self.image_label.setFixedSize(1920,1080)
 
         self.image_label.setStyleSheet("background-color:Grey;border-width: 4px;border-radius: 20px;alignment:center")
@@ -201,12 +181,6 @@ class App(QWidget):
         else:
             self.MainPage.addWidget(self.MainPage_button_widget,0,0,alignment=Qt.AlignBottom)
              
-       
-
-
-        # self.MainPage.addWidget(self.ExitButton,1,0,3,1)
-        # self.MainPage.addWidget(self.RecordButton,1,1,3,1)
-        # self.MainPage.addWidget(self.SettingButton,1,2,3,1)
 
         self.MainPageWidget = QWidget()
         self.MainPageWidget.setLayout(self.MainPage)
@@ -223,9 +197,12 @@ class App(QWidget):
         self.GainFader.setMaximum(12)
         self.GainFader.setValue(0)
         self.GainFader.setTickPosition(QSlider.TicksBelow)
+        self.GainFader.valueChanged.connect(self.update_label)
         self.GainFader.setTickInterval(1)
         self.GainFader.setFont(QFont("Arial",40))
         self.GainFader.setStyleSheet(SLIDER_STYLE)
+        self.GainFader.setFixedWidth(1000)
+        # self.GainLevel=QLabel("0")
 
         self.VolumeLabel = QLabel("Mic Array Digital Volume :")
         self.VolumeLabel.setFont(BUTTON_FONT)
@@ -235,58 +212,29 @@ class App(QWidget):
         self.VolumeFader.setMaximum(24)
         self.VolumeFader.setValue(0)
         self.VolumeFader.setTickPosition(QSlider.TicksBelow)
+        self.VolumeFader.valueChanged.connect(self.update_label)
         self.VolumeFader.setTickInterval(1)
         self.VolumeFader.setFont(QFont("Arial",40))
-        self.VolumeFader.setStyleSheet(SLIDER_STYLE)
+        self.VolumeFader.setStyleSheet(SLIDER_STYLE_2)
+        self.VolumeFader.setFixedWidth(1000)
+        # self.VolumeLevel=QLabel(str(0))
+
 
 
         self.FilterSelectLabel = QLabel("Mic Array Filter Select     :")
         self.FilterSelectLabel.setFont(BUTTON_FONT)
 
 
-        self.CheckBox_6kHz = QCheckBox('6kHz') 
-        self.CheckBox_6kHz.setGeometry(200, 150, 100, 30) 
-        self.CheckBox_6kHz.setChecked(False) 
-        self.CheckBox_6kHz.setFont(BUTTON_FONT)
-        self.CheckBox_6kHz.setStyleSheet("""QCheckBox::indicator {
-                                            width: 40px;
-                                            height: 40px;
-                                        }""")
-        # self.CheckBox_6kHz.stateChanged.connect(lambda:self.ToggleSelection(Frequency_Selection.LPF_6K.value))        
 
 
-        self.CheckBox_12kHz = QCheckBox('12kHz') 
-        self.CheckBox_12kHz.setGeometry(200, 150, 100, 30) 
-        self.CheckBox_12kHz.setChecked(False) 
-        self.CheckBox_12kHz.setFont(BUTTON_FONT)
-        self.CheckBox_12kHz.setStyleSheet("""QCheckBox::indicator {
-                                            width: 40px;
-                                            height: 40px;
-                                        }""")
-        # self.CheckBox_12kHz.stateChanged.connect(lambda:self.ToggleSelection(Frequency_Selection.LPF_12K.value))   
-        #
-
-
-        self.CheckBox_18kHz = QCheckBox('18kHz') 
-        self.CheckBox_18kHz.setGeometry(200, 150, 100, 30) 
-        self.CheckBox_18kHz.setChecked(False) 
-        self.CheckBox_18kHz.setFont(BUTTON_FONT)
-        self.CheckBox_18kHz.setStyleSheet("""QCheckBox::indicator {
-                                            width: 40px;
-                                            height: 40px;
-                                        }""")
-        # self.CheckBox_18kHz.stateChanged.connect(lambda:self.ToggleSelection(Frequency_Selection.LPF_18K.value))   
-   
-
-        self.CheckBox_Full = QCheckBox('Full Range') 
-        self.CheckBox_Full.setGeometry(200, 150, 100, 30) 
-        self.CheckBox_Full.setChecked(True) 
-        self.CheckBox_Full.setFont(BUTTON_FONT)
-        self.CheckBox_Full.setStyleSheet("""QCheckBox::indicator {
-                                            width: 40px;
-                                            height: 40px;
-                                        }""")
-        # self.CheckBox_Full.stateChanged.connect(lambda:self.ToggleSelection(Frequency_Selection.LPF_FULL.value))   
+        self.CheckBox_6kHz = self.Create_RadioBotton('6khz')
+        self.CheckBox_6kHz.clicked.connect(lambda:self.ToggleSelection(Frequency_Selection.LPF_6K.value))
+        self.CheckBox_12kHz = self.Create_RadioBotton('12khz')
+        self.CheckBox_12kHz.clicked.connect(lambda:self.ToggleSelection(Frequency_Selection.LPF_12K.value))
+        self.CheckBox_18kHz = self.Create_RadioBotton('18khz')
+        self.CheckBox_18kHz.clicked.connect(lambda:self.ToggleSelection(Frequency_Selection.LPF_18K.value))
+        self.CheckBox_Full = self.Create_RadioBotton('Full Range')
+        self.CheckBox_Full.clicked.connect(lambda:self.ToggleSelection(Frequency_Selection.LPF_FULL.value))
 
         self.BackButton = QPushButton()
         self.BackButton.clicked.connect(self.switchPage)
@@ -310,9 +258,10 @@ class App(QWidget):
 
         self.SettingPage.addWidget(self.GainLabel,1,0)
         self.SettingPage.addWidget(self.GainFader,1,1,1,4)
-        # self.MainPage.addWidget(self.textLabel,1,2,1,2)
+        # self.SettingPage.addWidget(self.GainLevel,1,2,alignment=Qt.AlignRight)
         self.SettingPage.addWidget(self.VolumeLabel,2,0)
         self.SettingPage.addWidget(self.VolumeFader,2,1,1,4)
+        # self.SettingPage.addWidget(self.VolumeLevel,2,2,alignment=Qt.AlignRight)
         self.SettingPage.addWidget(self.FilterSelectLabel,3,0)
 
         self.SettingPage.addWidget(self.CheckBox_6kHz,3,1)
@@ -331,7 +280,6 @@ class App(QWidget):
         # self.SettingPageWidget.setGeometry(1920,1080,960,1080)
 
 
-        # setAlignment(Qt.AlignLeft|Qt.AlignRight)
         self.stacked_widget.setContentsMargins(0,0,0,0)
         self.MainPage.setContentsMargins(0,0,0,0)
         self.layout.setContentsMargins(0,0,0,0)
@@ -339,33 +287,29 @@ class App(QWidget):
         self.stacked_widget.addWidget(self.MainPageWidget)
         self.stacked_widget.addWidget(self.SettingPageWidget)
 
-        self.ToggleSelection(Frequency_Selection.LPF_FULL.value)
+        # self.ToggleSelection(Frequency_Selection.LPF_FULL.value)
 
         # self.stacked_widget.(self.MainPage)
         self.layout.addWidget(self.stacked_widget)
         # self.setContentsMargins(0,0,0,0)
         
-
-        # create a vertical box layout and add the two labels
-        # vbox = QVBoxLayout()
-        # vbox.addWidget(self.image_label)
-        # vbox.addWidget(self.textLabel)
         # set the vbox layout as the widgets layout
         self.setLayout(self.layout)
         self.setFixedSize(1920,1080)
  
 
-        # self.Monitor = QDesktopWidget().screenGeometry(display_monitor)
+      
         self.setGeometry(QApplication.screens()[self.ScreenNumber].geometry())
-        # self.setGeometry(self.Monitor.left(),self.Monitor.right())
         self.showFullScreen()
         # create the video capture thread
         self.thread = VideoThread()
+
+        self.audio_thread = AudioThread()
         # connect its signal to the update_image slot
         self.thread.change_pixmap_signal.connect(self.update_image)
         # start the thread
         self.thread.start()
-
+        
 
 
     @pyqtSlot(np.ndarray)
@@ -387,16 +331,30 @@ class App(QWidget):
     
     def ToggleSelection(self,choice):
         self.LPF_Select = choice
+        i = 0
         list_of_range = [self.CheckBox_6kHz,self.CheckBox_12kHz,self.CheckBox_18kHz,self.CheckBox_Full]
-        for i in range (len(list_of_range)):
-                if i != choice:
-                    list_of_range[i].setChecked(False)
-                    # list_of_range[i].setEnabled(True)
-                else:
-                     list_of_range[i].setChecked(True)
-                    #  list_of_range[i].setEnabled(False)
-                # else:
-                    # list_of_range[i].setChecked(False)
+        list_frequency = [Frequency_Selection.LPF_6K,Frequency_Selection.LPF_12K,Frequency_Selection.LPF_18K,Frequency_Selection.LPF_FULL]
+        for item in list_frequency:
+            if item.value != choice:
+                list_of_range[i].setChecked(False)
+            else:
+                    list_of_range[i].setChecked(True)
+            i+=1
+
+    def mousePressEvent(self, event):
+        # Handle mouse press events
+        mouse_position = event.pos()
+        self.text_label.appendPlainText(f"Clicked on [{mouse_position.x()},{mouse_position.y()}]")
+        # Add ethernet handler here 
+    
+
+    def Create_RadioBotton(self,Title):
+        Target = QRadioButton(Title) 
+        Target.setGeometry(200, 150, 100, 30) 
+        Target.setChecked(False) 
+        Target.setFont(BUTTON_FONT)
+        Target.setStyleSheet(RADIO_STYLE)
+        return Target
     
     def Record_clicked(self):
         self.RECORDING = not self.RECORDING
@@ -404,10 +362,15 @@ class App(QWidget):
             self.RecordButton.setStyleSheet("background-color:red ; color :white ;border-width: 4px;border-radius: 20px;")
 
             self.text_label.appendPlainText("Recording")
+            self.start_recording()
         else:
             self.RecordButton.setStyleSheet(BUTTON_STYLE_RED)
             self.text_label.appendPlainText("Stopped Recording")   
+            self.stop_recording
                   
+    def update_label(self, value):
+        # Update the label text with the current slider value
+        print(value)
 
     def switchPage(self):
         self.index+=1 
@@ -417,6 +380,28 @@ class App(QWidget):
             
         next_index = self.index % self.stacked_widget.count()  # Cycle through the pages
         self.stacked_widget.setCurrentIndex(next_index)
+
+
+    def start_recording(self):
+        self.is_recording = True
+        self.text_label.appendPlainText('Status: Recording')
+
+        self.audio_thread.start()
+        # with open(CURRENT_PATH+"/Command.txt", 'w') as file:
+        # # Write some text to the file
+        #     file.write("Recording")
+       
+
+    def stop_recording(self):
+        self.is_recording = False
+        self.text_label.appendPlainText('Status: Not Recording')
+        with open(CURRENT_PATH+"/Command.txt", 'w') as file:
+        # Write some text to the file
+            file.write("Stop")
+
+
+
+    
 
     def Exit(self):
         exit()
