@@ -33,7 +33,6 @@ START_RECORDING = False
 AUDIO_NAME=""
 VIDEO_NAME =""
 OUTPUT_NAME=""
-DATE = 0
 
 AUDIO_PATH = "\Audio"
 OUTPUT_PATH = "\Combined"
@@ -47,28 +46,27 @@ def check_folder_existence(folder_path):
         os.makedirs(folder_path)
 
 def combine_video_audio(video_path, audio_path, output_path):
+    global OUTPUT_NAME,AUDIO_NAME,VIDEO_NAME
+    ffmpeg_options = "-analyzeduration 100M -probesize 100M"
     # Load the video clip
-    video_clip = VideoFileClip(video_path)
+    video_clip = VideoFileClip(video_path, audio=False)
+    # Cut off the first 3 second to align with the audio ( might need adjustment)
     video_clip = video_clip.subclip(3)
     # Load the audio clip
     audio_clip = AudioFileClip(audio_path)
 
-
     # Set the audio of the video to the loaded audio clip
     video_clip = video_clip.set_audio(audio_clip)
-
-    # output_path = video_clip[:-4]+"Com.avi"
-
     # Write the combined clip to a new file
     video_clip.write_videofile(output_path, codec="libx264", audio_codec="aac", temp_audiofile='temp.m4a', remove_temp=False)
 
-
+# Create necessary DIR
 check_folder_existence(CURRENT_PATH+VIDEO_SAVE_DIRECTORY)
 check_folder_existence(CURRENT_PATH+VIDEO_SAVE_DIRECTORY+VIDEO_DATE)
 check_folder_existence(CURRENT_PATH+AUDIO_PATH+"\\"+VIDEO_DATE)
 check_folder_existence(CURRENT_PATH+OUTPUT_PATH+"\\"+VIDEO_DATE)
 
-
+# Combine As output thread 
 class VideoAudioThread(QThread):
     finished = pyqtSignal()
 
@@ -81,19 +79,16 @@ class VideoAudioThread(QThread):
     def run(self):
         global AUDIO_NAME
         print("Combine Video")
-        print(self.video_path)
-        print(self.audio_path)
-        print(self.output_path)
         time.sleep(1)
-        combine_video_audio(self.video_path, AUDIO_NAME, self.output_path)
+        combine_video_audio(self.video_path, self.audio_path,self.output_path)
 
-
+# Video Thread
 class VideoThread(QThread):
-    # global 
+
     change_pixmap_signal = pyqtSignal(np.ndarray)
      
     def run(self):
-        global START_RECORDING,VIDEO_NAME,OUTPUT_NAME
+        global START_RECORDING,VIDEO_NAME,OUTPUT_NAME,AUDIO_NAME
         # capture from web cam
         i = 0
         cap = cv2.VideoCapture(2)
@@ -112,35 +107,26 @@ class VideoThread(QThread):
                     current_datetime = datetime.now()
                     formatted_datetime = current_datetime.strftime("[%m-%d-%y]%H_%M_%S")
                     self.video_name = CURRENT_PATH+VIDEO_SAVE_DIRECTORY+VIDEO_DATE + "\\"+str(formatted_datetime)+'.avi'
-                    self.output_path = CURRENT_PATH+OUTPUT_PATH+VIDEO_DATE+ "\\"+str(formatted_datetime)+'.avi'
+                    self.output_path = CURRENT_PATH+OUTPUT_PATH+VIDEO_DATE+ "\\"+str(formatted_datetime)+'.mp4'
                     VIDEO_NAME = self.video_name
                     OUTPUT_NAME=self.output_path
+                    AUDIO_NAME = CURRENT_PATH+AUDIO_PATH+VIDEO_DATE+ "\\"+str(formatted_datetime)+'.wav'
                     FPS = 25
-                    # print(fps,FPS)
                     out = cv2.VideoWriter(self.video_name, cv2.VideoWriter_fourcc('M','J','P','G'), FPS, (video_width,video_height))
                     i+=1
-                elif i > 1:
-                    out.write(self.cv_img)
-                    i+1
-                    
                 else:
-                    i+=1
+                    out.write(self.cv_img)
+                
             else:
                 if (i > 0 ):
                     out.release()
                     i=0
             if ret:
                 self.change_pixmap_signal.emit(self.cv_img)
-
-class APP_PAGE(Enum):
-        MAIN = 0
-        SETTING = 1
-        
-
+# Audio Thread
 class AudioThread(QThread):
-    
     def run(self):
-        global STOP,START_RECORDING,DATE,AUDIO_NAME
+        global START_RECORDING,AUDIO_NAME
         sample_rate = 48000  # Hz
         self.audio_buffer = []  # Buffer to store recorded audio data
 
@@ -152,30 +138,23 @@ class AudioThread(QThread):
             self.audio_buffer.append(indata.copy())
 
 
-        print("start recording")
         current_datetime = datetime.now()
         formatted_datetime = current_datetime.strftime("[%m-%d-%y]%H_%M_%S")
-        print(formatted_datetime)
         START_RECORDING = True
-        DATE=formatted_datetime
         with sd.InputStream(callback=callback, channels=1, samplerate=sample_rate):
              while not self.isInterruptionRequested():
                 self.msleep(100)  # Adjust the sleep interval based on your preference
 
-        
         # Convert the buffer to a numpy array
         audio_data = np.concatenate(self.audio_buffer, axis=0)
-
-       
         audio_name = CURRENT_PATH+AUDIO_PATH+VIDEO_DATE + "\\"+str(formatted_datetime)+'.wav'
         AUDIO_NAME=audio_name
         # Save the audio data to a WAV file
         wavio.write(audio_name, audio_data, sample_rate, sampwidth=3)
-        print("Finsihed Recording")
-        STOP=True
 
-
-
+class APP_PAGE(Enum):
+        MAIN = 0
+        SETTING = 1
 
 class Frequency_Selection(Enum):
         LPF_6K = 0
@@ -194,57 +173,35 @@ class App(QWidget):
         else:
             self.ScreenNumber = 0
         self.setWindowTitle("ISD Mic array Project")
+        self.setStyleSheet("background-color:lightgreen")
 
         self.disply_width = 1920
         self.display_height = 1080
+        self.index = APP_PAGE.MAIN.value
         self.LPF_Select = Frequency_Selection.LPF_FULL.value
         self.ButtonText = QFont("Arial", 15)
+
         # create the label that holds the image
         self.image_label = QLabel(self)
         self.image_label.setText("Loading Camera Frame ...")
         self.image_label.setStyleSheet("")
         self.image_label.setFont(QFont("Arial",40))
-
         self.image_label.setFixedSize(1920,1080)
-
         self.image_label.setStyleSheet("background-color:Grey;border-width: 4px;border-radius: 20px;alignment:center")
         self.image_label.setContentsMargins(0,0,0,0)
-
         self.RECORDING = False
         
 
         self.stacked_widget = QStackedWidget()
         self.stacked_widget.setContentsMargins(0, 0, 0, 0)  # Set margins to zero
-        
         self.stacked_widget.setFixedSize(1920,1080)
-        # self.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 green, stop:1 white);")
-        self.setStyleSheet("background-color:lightgreen")
         
-        # create a text label
-        self.index = APP_PAGE.MAIN.value
-
-
         self.layout = QVBoxLayout()
         self.layout.addWidget(self.stacked_widget)
         self.layout.setContentsMargins(0,0,0,0)
-      
 
-     
-
-        self.ExitButton = QPushButton()
-        self.ExitButton.clicked.connect(self.Exit)
-        self.ExitButton.setFixedSize(NUM_BUTTON_WIDTH,NUM_BUTTON_HEIGHT)
-        self.ExitButton.setText("Exit")
-        self.ExitButton.setFont(BUTTON_FONT )
-        self.ExitButton.setStyleSheet(BUTTON_STYLE)
-
-        self.SettingButton = QPushButton()
-        self.SettingButton.clicked.connect(self.switchPage)
-        self.SettingButton.setFixedSize(NUM_BUTTON_WIDTH,NUM_BUTTON_HEIGHT)
-        self.SettingButton.setText("Setting")
-        self.SettingButton.setFont(BUTTON_FONT)
-        self.SettingButton.setStyleSheet(BUTTON_STYLE)
-
+        self.ExitButton = self.Create_Button("Exit",self.Exit,BUTTON_STYLE)
+        self.SettingButton = self.Create_Button("Setting",self.switchPage,BUTTON_STYLE)
 
         self.text_label =QPlainTextEdit()
         self.text_label.setFixedSize(250,800)
@@ -254,7 +211,6 @@ class App(QWidget):
         self.MainPage = QGridLayout()
         self.MainPage.setHorizontalSpacing(0)  # Set horizontal spacing to zero   
         self.MainPage.setVerticalSpacing(0)
-        # self.MainPage = QVBoxLayout()
         self.MainPage.addWidget(self.image_label,0,0,alignment=Qt.AlignCenter)
        
         
@@ -262,17 +218,8 @@ class App(QWidget):
             self.MainPage.addWidget(self.text_label,0,0,alignment=Qt.AlignRight)
         self.MainPage.setHorizontalSpacing(0)  # Set horizontal spacing to zero   
         self.MainPage.setVerticalSpacing(0)  # Set horizontal spacing to zero   
-        # self.MainPage.addWidget(self.image_label)
         
-
-        self.RecordButton = QPushButton()
-        self.RecordButton.clicked.connect(self.Record_clicked)
-        self.RecordButton.setFixedSize(NUM_BUTTON_WIDTH,NUM_BUTTON_HEIGHT)
-        self.RecordButton.setText("Record")
-        self.RecordButton.setFont(BUTTON_FONT )
-        self.RecordButton.setStyleSheet(BUTTON_STYLE_RED)
-
-        # self.MainPage.addWidget(self.textLabel,1,2,1,2)
+        self.RecordButton = self.Create_Button("Record",self.Record_clicked,BUTTON_STYLE_RED)
 
         self.MainPage_button = QHBoxLayout()
         self.MainPage_button.addWidget(self.ExitButton,alignment=Qt.AlignLeft)
@@ -310,7 +257,6 @@ class App(QWidget):
         self.GainFader.setFont(QFont("Arial",40))
         self.GainFader.setStyleSheet(SLIDER_STYLE)
         self.GainFader.setFixedWidth(1000)
-        # self.GainLevel=QLabel("0")
 
         self.VolumeLabel = QLabel("Mic Array Digital Volume :")
         self.VolumeLabel.setFont(BUTTON_FONT)
@@ -325,14 +271,9 @@ class App(QWidget):
         self.VolumeFader.setFont(QFont("Arial",40))
         self.VolumeFader.setStyleSheet(SLIDER_STYLE_2)
         self.VolumeFader.setFixedWidth(1000)
-        # self.VolumeLevel=QLabel(str(0))
-
-
-
+ 
         self.FilterSelectLabel = QLabel("Mic Array Filter Select     :")
         self.FilterSelectLabel.setFont(BUTTON_FONT)
-
-
 
 
         self.CheckBox_6kHz = self.Create_RadioBotton('6khz')
@@ -344,34 +285,21 @@ class App(QWidget):
         self.CheckBox_Full = self.Create_RadioBotton('Full Range')
         self.CheckBox_Full.clicked.connect(lambda:self.ToggleSelection(Frequency_Selection.LPF_FULL.value))
 
-        self.BackButton = QPushButton()
-        self.BackButton.clicked.connect(self.switchPage)
-        self.BackButton.setFixedSize(NUM_BUTTON_WIDTH+100,NUM_BUTTON_HEIGHT)
-        self.BackButton.setText("Back")
-        self.BackButton.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.BackButton.setFont(self.ButtonText)
-        self.BackButton.setStyleSheet(BUTTON_STYLE )
+        self.BackButton = self.Create_Button("Back",self.switchPage,BUTTON_STYLE)
         self.BackButton.setFont(QFont("Arial",40))
 
-        self.ApplyButton = QPushButton()
-        # self.ApplyButton.clicked.connect(self.switchPage)
-        self.ApplyButton.setFixedSize(NUM_BUTTON_WIDTH+100,NUM_BUTTON_HEIGHT)
-        self.ApplyButton.setText("Apply")
-        self.ApplyButton.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.ApplyButton.setFont(self.ButtonText)
-        self.ApplyButton.setStyleSheet(BUTTON_STYLE )
+        self.ApplyButton = self.Create_Button("Apply",self.Exit,BUTTON_STYLE)
         self.ApplyButton.setFont(QFont("Arial",40))
 
 
 
         self.SettingPage.addWidget(self.GainLabel,1,0)
-        self.SettingPage.addWidget(self.GainFader,1,1,1,4)
-        # self.SettingPage.addWidget(self.GainLevel,1,2,alignment=Qt.AlignRight)
-        self.SettingPage.addWidget(self.VolumeLabel,2,0)
-        self.SettingPage.addWidget(self.VolumeFader,2,1,1,4)
-        # self.SettingPage.addWidget(self.VolumeLevel,2,2,alignment=Qt.AlignRight)
-        self.SettingPage.addWidget(self.FilterSelectLabel,3,0)
+        self.SettingPage.addWidget(self.GainFader,1,1,1,5)
 
+        self.SettingPage.addWidget(self.VolumeLabel,2,0)
+        self.SettingPage.addWidget(self.VolumeFader,2,1,1,5)
+
+        self.SettingPage.addWidget(self.FilterSelectLabel,3,0)
         self.SettingPage.addWidget(self.CheckBox_6kHz,3,1)
         self.SettingPage.addWidget(self.CheckBox_12kHz,3,2)
         self.SettingPage.addWidget(self.CheckBox_18kHz,3,3)
@@ -385,8 +313,6 @@ class App(QWidget):
         self.SettingPageWidget.setLayout(self.SettingPage)
         
         self.SettingPageWidget.setFixedSize(1920,1080)
-        # self.SettingPageWidget.setGeometry(1920,1080,960,1080)
-
 
         self.stacked_widget.setContentsMargins(0,0,0,0)
         self.MainPage.setContentsMargins(0,0,0,0)
@@ -395,11 +321,8 @@ class App(QWidget):
         self.stacked_widget.addWidget(self.MainPageWidget)
         self.stacked_widget.addWidget(self.SettingPageWidget)
 
-        # self.ToggleSelection(Frequency_Selection.LPF_FULL.value)
-
-        # self.stacked_widget.(self.MainPage)
         self.layout.addWidget(self.stacked_widget)
-        # self.setContentsMargins(0,0,0,0)
+
         
         # set the vbox layout as the widgets layout
         self.setLayout(self.layout)
@@ -448,6 +371,15 @@ class App(QWidget):
             else:
                     list_of_range[i].setChecked(True)
             i+=1
+        
+    def Create_Button(self,Title,function,Style):
+        Button= QPushButton()
+        Button.clicked.connect(function)
+        Button.setFixedSize(NUM_BUTTON_WIDTH,NUM_BUTTON_HEIGHT)
+        Button.setText(Title)
+        Button.setFont(BUTTON_FONT )
+        Button.setStyleSheet(Style)
+        return Button
 
     def mousePressEvent(self, event):
         # Handle mouse press events
@@ -494,37 +426,24 @@ class App(QWidget):
     def start_recording(self):
         self.is_recording = True
         self.text_label.appendPlainText('Status: Recording')
-        
-
         self.audio_thread.start()
-        # with open(CURRENT_PATH+"/Command.txt", 'w') as file:
-        # # Write some text to the file
-        #     file.write("Recording")
+
        
 
     def stop_recording(self):
-        global START_RECORDING,AUDIO_NAME
+        global START_RECORDING,VIDEO_NAME,AUDIO_NAME,OUTPUT_NAME
         self.is_recording = False
         START_RECORDING=False
         self.text_label.appendPlainText('Status: Not Recording')
         self.audio_thread.requestInterruption()
 
+
         self.combine_thread = VideoAudioThread(VIDEO_NAME,AUDIO_NAME,OUTPUT_NAME)
         self.combine_thread.start()
 
-        # self.audio_thread.wait()
-        with open(CURRENT_PATH+"/Command.txt", 'w') as file:
-        # Write some text to the file
-            file.write("Stop")
-
-
-
-    
 
     def Exit(self):
-        
-        self.combine_thread.terminate()
-        self.audio_thread.terminate()
+     
         exit()
     
 if __name__=="__main__":
