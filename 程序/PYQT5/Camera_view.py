@@ -10,18 +10,92 @@ import numpy as np
 import sounddevice as sd 
 import os 
 import wavio #pip3 install wavio
+from datetime import datetime
+from moviepy.editor import VideoFileClip, AudioFileClip
+import time
+
+
+
+current_datetime = datetime.now()
+# Format the date and time
+formatted_datetime = current_datetime.strftime("%m-%d-%y")
+
+# Define Directory Path
+VIDEO_SAVE_DIRECTORY = "\Video"
+VIDEO_DATE = "\\" + formatted_datetime
 display_monitor= 0
 NUM_BUTTON_WIDTH = 200
 NUM_BUTTON_HEIGHT = 100
 DEBUG = True
 BUTTON_FONT = QFont("Arial",40)
 CURRENT_PATH = os.getcwd()
+START_RECORDING = False
+AUDIO_NAME=""
+VIDEO_NAME =""
+OUTPUT_NAME=""
+DATE = 0
 
-class VideoThread(QThread):
-    change_pixmap_signal = pyqtSignal(np.ndarray)
+AUDIO_PATH = "\Audio"
+OUTPUT_PATH = "\Combined"
+
+# Create neccessary Directory
+def check_folder_existence(folder_path):
+    if os.path.exists(folder_path) and os.path.isdir(folder_path):
+        print(f"The folder '{folder_path}' exists.")
+    else:
+        print(f"The folder '{folder_path}' does not exist.")
+        os.makedirs(folder_path)
+
+def combine_video_audio(video_path, audio_path, output_path):
+    # Load the video clip
+    video_clip = VideoFileClip(video_path)
+    video_clip = video_clip.subclip(3)
+    # Load the audio clip
+    audio_clip = AudioFileClip(audio_path)
+
+
+    # Set the audio of the video to the loaded audio clip
+    video_clip = video_clip.set_audio(audio_clip)
+
+    # output_path = video_clip[:-4]+"Com.avi"
+
+    # Write the combined clip to a new file
+    video_clip.write_videofile(output_path, codec="libx264", audio_codec="aac", temp_audiofile='temp.m4a', remove_temp=False)
+
+
+check_folder_existence(CURRENT_PATH+VIDEO_SAVE_DIRECTORY)
+check_folder_existence(CURRENT_PATH+VIDEO_SAVE_DIRECTORY+VIDEO_DATE)
+check_folder_existence(CURRENT_PATH+AUDIO_PATH+"\\"+VIDEO_DATE)
+check_folder_existence(CURRENT_PATH+OUTPUT_PATH+"\\"+VIDEO_DATE)
+
+
+class VideoAudioThread(QThread):
+    finished = pyqtSignal()
+
+    def __init__(self, video_path, audio_path, output_path):
+        super().__init__()
+        self.video_path = video_path
+        self.audio_path = audio_path
+        self.output_path = output_path
 
     def run(self):
+        global AUDIO_NAME
+        print("Combine Video")
+        print(self.video_path)
+        print(self.audio_path)
+        print(self.output_path)
+        time.sleep(1)
+        combine_video_audio(self.video_path, AUDIO_NAME, self.output_path)
+
+
+class VideoThread(QThread):
+    # global 
+    change_pixmap_signal = pyqtSignal(np.ndarray)
+     
+    def run(self):
+        global START_RECORDING,VIDEO_NAME,OUTPUT_NAME
         # capture from web cam
+        i = 0
         cap = cv2.VideoCapture(2)
         
         cap.set(3, 1920)
@@ -32,7 +106,29 @@ class VideoThread(QThread):
         print(video_height,video_width)
         while True:
             ret, self.cv_img = cap.read()
-            
+            if (START_RECORDING == True):
+                if (i == 0):
+                    print("initiate Video")
+                    current_datetime = datetime.now()
+                    formatted_datetime = current_datetime.strftime("[%m-%d-%y]%H_%M_%S")
+                    self.video_name = CURRENT_PATH+VIDEO_SAVE_DIRECTORY+VIDEO_DATE + "\\"+str(formatted_datetime)+'.avi'
+                    self.output_path = CURRENT_PATH+OUTPUT_PATH+VIDEO_DATE+ "\\"+str(formatted_datetime)+'.avi'
+                    VIDEO_NAME = self.video_name
+                    OUTPUT_NAME=self.output_path
+                    FPS = 25
+                    # print(fps,FPS)
+                    out = cv2.VideoWriter(self.video_name, cv2.VideoWriter_fourcc('M','J','P','G'), FPS, (video_width,video_height))
+                    i+=1
+                elif i > 1:
+                    out.write(self.cv_img)
+                    i+1
+                    
+                else:
+                    i+=1
+            else:
+                if (i > 0 ):
+                    out.release()
+                    i=0
             if ret:
                 self.change_pixmap_signal.emit(self.cv_img)
 
@@ -42,10 +138,10 @@ class APP_PAGE(Enum):
         
 
 class AudioThread(QThread):
-    global STOP
+    
     def run(self):
-        sample_rate = 44100  # Hz
-        duration = 10  # seconds
+        global STOP,START_RECORDING,DATE,AUDIO_NAME
+        sample_rate = 48000  # Hz
         self.audio_buffer = []  # Buffer to store recorded audio data
 
         # Use a callback function for non-blocking audio recording
@@ -55,14 +151,26 @@ class AudioThread(QThread):
             # print("Recording audio...")
             self.audio_buffer.append(indata.copy())
 
+
+        print("start recording")
+        current_datetime = datetime.now()
+        formatted_datetime = current_datetime.strftime("[%m-%d-%y]%H_%M_%S")
+        print(formatted_datetime)
+        START_RECORDING = True
+        DATE=formatted_datetime
         with sd.InputStream(callback=callback, channels=1, samplerate=sample_rate):
-            self.sleep(duration)
+             while not self.isInterruptionRequested():
+                self.msleep(100)  # Adjust the sleep interval based on your preference
+
         
         # Convert the buffer to a numpy array
         audio_data = np.concatenate(self.audio_buffer, axis=0)
 
+       
+        audio_name = CURRENT_PATH+AUDIO_PATH+VIDEO_DATE + "\\"+str(formatted_datetime)+'.wav'
+        AUDIO_NAME=audio_name
         # Save the audio data to a WAV file
-        wavio.write("recorded_audio.wav", audio_data, sample_rate, sampwidth=3)
+        wavio.write(audio_name, audio_data, sample_rate, sampwidth=3)
         print("Finsihed Recording")
         STOP=True
 
@@ -363,10 +471,11 @@ class App(QWidget):
 
             self.text_label.appendPlainText("Recording")
             self.start_recording()
+            
         else:
             self.RecordButton.setStyleSheet(BUTTON_STYLE_RED)
             self.text_label.appendPlainText("Stopped Recording")   
-            self.stop_recording
+            self.stop_recording()
                   
     def update_label(self, value):
         # Update the label text with the current slider value
@@ -385,6 +494,7 @@ class App(QWidget):
     def start_recording(self):
         self.is_recording = True
         self.text_label.appendPlainText('Status: Recording')
+        
 
         self.audio_thread.start()
         # with open(CURRENT_PATH+"/Command.txt", 'w') as file:
@@ -393,8 +503,16 @@ class App(QWidget):
        
 
     def stop_recording(self):
+        global START_RECORDING,AUDIO_NAME
         self.is_recording = False
+        START_RECORDING=False
         self.text_label.appendPlainText('Status: Not Recording')
+        self.audio_thread.requestInterruption()
+
+        self.combine_thread = VideoAudioThread(VIDEO_NAME,AUDIO_NAME,OUTPUT_NAME)
+        self.combine_thread.start()
+
+        # self.audio_thread.wait()
         with open(CURRENT_PATH+"/Command.txt", 'w') as file:
         # Write some text to the file
             file.write("Stop")
@@ -404,6 +522,9 @@ class App(QWidget):
     
 
     def Exit(self):
+        
+        self.combine_thread.terminate()
+        self.audio_thread.terminate()
         exit()
     
 if __name__=="__main__":
