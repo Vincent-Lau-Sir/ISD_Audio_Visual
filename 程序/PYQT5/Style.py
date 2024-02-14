@@ -1,3 +1,8 @@
+WINDOW_WIDTH = 1920
+WINDOW_HEIGHT = 1080
+BUTTON_BAR_HEIGHT = 200
+
+
 BUTTON_STYLE = """
         QPushButton {
             background-color: White; 
@@ -107,3 +112,6 @@ RADIO_STYLE = """
                 height: 30px;
             }
         """
+
+NUM_BUTTON_WIDTH = 200
+NUM_BUTTON_HEIGHT = 100
