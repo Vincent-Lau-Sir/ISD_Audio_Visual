@@ -17,6 +17,8 @@ import time
 from Widget_library import *
 from Event import *
 from Enum_library import  *
+from Delay_Transmission import *
+
 current_datetime = datetime.now()
 # Format the date and time
 formatted_datetime = current_datetime.strftime("%m-%d-%y")
@@ -68,7 +70,7 @@ class VideoThread(QThread):
         video_width = int(cap.get(3))
         video_height = int(cap.get(4))
 
-        print(video_height,video_width)
+        print("Input ratio : ",video_height,video_width)
         while True:
             ret, self.cv_img = cap.read()
             if (START_RECORDING == True):
@@ -253,6 +255,12 @@ class App(QWidget):
         # Handle mouse press events
         mouse_position = event.pos()
         self.text_label.appendPlainText(f"Clicked on [{mouse_position.x()},{mouse_position.y()}]")
+        row = int(mouse_position.y()) // (WINDOW_WIDTH // 4 )
+        col =int( mouse_position.x()) // (WINDOW_HEIGHT // 3)
+        area = row*4 + col +1
+        self.text_label.appendPlainText(f"Area: {area} , row :{row}, column:{col}") 
+        # message = create_and_send_packet(HOST,PORT, area.to_bytes( 2, byteorder='big'))
+        Test_delay_function()
 
     
     def Record_clicked(self):
