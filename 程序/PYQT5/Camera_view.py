@@ -73,6 +73,14 @@ class VideoThread(QThread):
         print("Input ratio : ",video_height,video_width)
         while True:
             ret, self.cv_img = cap.read()
+            if DEBUG == True:
+                cv2.line(self.cv_img,(int(video_width/4),0) ,(int(video_width/4),int(video_height)) , (255, 100,  15), 2)
+                cv2.line(self.cv_img,(int(video_width*2/4),0) ,(int(video_width*2/4),int(video_height)) , (255, 100,  15), 2)
+                cv2.line(self.cv_img,(int(video_width*3/4),0) ,(int(video_width*3/4),int(video_height)) , (255, 100,  15), 2)
+
+                cv2.line(self.cv_img,(0,int(video_height/4)) ,(int(video_width),int(video_height/4)) , (255, 100,  15), 2)
+                cv2.line(self.cv_img,(0,int(video_height*2/4)) ,(int(video_width),int(video_height*2/4)) , (255, 100,  15), 2)
+                cv2.line(self.cv_img,(0,int(video_height*3/4)) ,(int(video_width),int(video_height*3/4)) , (255, 100,  15), 2)
             if (START_RECORDING == True):
                 if (i == 0):
                     print("initiate Video")
@@ -255,10 +263,11 @@ class App(QWidget):
         # Handle mouse press events
         mouse_position = event.pos()
         self.text_label.appendPlainText(f"Clicked on [{mouse_position.x()},{mouse_position.y()}]")
-        row = int(mouse_position.y()) // (WINDOW_WIDTH // 4 )
-        col =int( mouse_position.x()) // (WINDOW_HEIGHT // 3)
+        row = int(mouse_position.y()) // (WINDOW_HEIGHT // 4 )
+        col =int( mouse_position.x()) // (WINDOW_WIDTH // 4)
+        print(row , col )
         area = row*4 + col +1
-        self.text_label.appendPlainText(f"Area: {area} , row :{row}, column:{col}") 
+        self.text_label.appendPlainText(f"Area: {area}") 
         # message = create_and_send_packet(HOST,PORT, area.to_bytes( 2, byteorder='big'))
         Test_delay_function()
 
