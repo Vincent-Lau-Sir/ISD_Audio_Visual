@@ -33,6 +33,7 @@ def combine_video_audio(video_path, audio_path, output_path):
     # Write the combined clip to a new file
     video_clip.write_videofile(output_path, codec="libx264", audio_codec="aac", temp_audiofile='temp.m4a', remove_temp=False)
 
+
 def write_start_txt():
     CURRENT_PATH = os.getcwd()
     with open(CURRENT_PATH+"/ready_video.txt", 'w') as file:

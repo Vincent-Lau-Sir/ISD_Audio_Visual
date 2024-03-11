@@ -314,6 +314,7 @@ def handleMotion(event):
     row = y // block_height
     col = x // block_width
     area = row * 4 + col + 1
+    print ( area , row , block_height, label_video.winfo_width() , col , block_width,label_video.winfo_height() ) # 7 1 180 2 320
     actual_x = (x - 960) / 1000.0
     actual_y = (y - 540) / 1000.0
     this_location[1] = actual_x
@@ -322,6 +323,7 @@ def handleMotion(event):
     print(delay)
     print(delay_binary_output)
     position_string = "x: {}  y: {}  area:{}\n".format(event.x, event.y, area)
+    print(position_string)
     # need to change host and port here once IP of the server is changed.
     host = "192.168.1.10"
     port = 5001
@@ -386,7 +388,7 @@ def Read_audio_status():
 Initialize()
 Audio_Processing = subprocess.Popen(["cmd", "/c", "start", "cmd", "/k", command], shell=True)
 try: 
-    cap = cv.VideoCapture(1)  # for selecting camera from 0 to 2. In surface Pro, usb camera is '2'
+    cap = cv.VideoCapture(0)  # for selecting camera from 0 to 2. In surface Pro, usb camera is '2'
     if (cap.isOpened() == False):
         print("Unable to read camera feed")
     print("Pass 0 ")
@@ -395,6 +397,8 @@ try:
     print("Pass 1 ")
     video_width = int(cap.get(3))
     video_height = int(cap.get(4))
+    # print(video_height,video_width)
+    # exit()
     border_width = 40
     down_panel = 120
     print(cap.isOpened(), video_width, video_height)
